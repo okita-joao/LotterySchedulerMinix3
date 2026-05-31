@@ -25,7 +25,9 @@ int do_clear(struct proc * caller, message * m_ptr)
   struct proc *rc;
   int exit_p;
   int i;
-
+  int nr_pai;
+  struct proc *pai;
+  
   if(!isokendpt(m_ptr->m_lsys_krn_sys_clear.endpt, &exit_p)) {
       /* get exiting process */
       return EINVAL;
@@ -51,10 +53,10 @@ int do_clear(struct proc * caller, message * m_ptr)
   /* Turn off any alarm timers at the clock. */   
   reset_kernel_timer(&priv(rc)->s_alarm_timer);
 
-  int nr_pai;
+  
   /* Verifica se o pai ainda está vivo pelo seu endpoint guardado */
   if(isokendpt(rc->pai_endpt, &nr_pai)) {
-    struct proc pai = proc_addr(nr_pai);
+    pai = proc_addr(nr_pai);
 
     /* Caso o pai ainda esteja vivo o processo retorna a herança que recebeu a ele */
     if(pai->p_rts_flags != RTS_SLOT_FREE) {
@@ -63,7 +65,9 @@ int do_clear(struct proc * caller, message * m_ptr)
   }
 
   rc->num_tickets = 0;
-  rc->pai_endpt = 0;
+  rc->pai_endpt = NONE;
+  rc->emprestado = 0;
+  rc->devedor_endpt = NONE;
 
   /* Make sure that the exiting process is no longer scheduled,
    * and mark slot as FREE. Also mark saved fpu contents as not significant.
