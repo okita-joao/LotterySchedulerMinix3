@@ -136,10 +136,10 @@ struct proc {
 #endif
 
   int num_tickets; /* Numero de tickets de um processo  */  
-  struct proc *pai; /* Ponteiro para o processo pai */
+  endpoint_t pai_endpt; /* Endpoint do processo pai */
   int compensacao; /* Flag que indica o saldo de compensacao  */
   int emprestado; /* Tickets emprestados */
-  int devedor_endpt; /* CPF do devedor */
+  endpoint_t devedor_endpt; /* CPF do devedor */
 };
 
 #endif /* __ASSEMBLY__ */
