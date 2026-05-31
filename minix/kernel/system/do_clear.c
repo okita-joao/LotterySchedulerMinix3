@@ -50,12 +50,20 @@ int do_clear(struct proc * caller, message * m_ptr)
 
   /* Turn off any alarm timers at the clock. */   
   reset_kernel_timer(&priv(rc)->s_alarm_timer);
-  
-  if(rc->pai != NULL && !(rc->pai->p_rts_flags & RTS_SLOT_FREE)) {
-      rc->pai->num_tickets += rc->num_tickets;
+
+  int nr_pai;
+  /* Verifica se o pai ainda está vivo pelo seu endpoint guardado */
+  if(isokendpt(rc->pai_endpt, &nr_pai)) {
+    struct proc pai = proc_addr(nr_pai);
+
+    /* Caso o pai ainda esteja vivo o processo retorna a herança que recebeu a ele */
+    if(pai->p_rts_flags != RTS_SLOT_FREE) {
+      pai->num_tickets += rc->num_tickets;
+    }
   }
+
   rc->num_tickets = 0;
-  rc->pai = NULL;
+  rc->pai_endpt = 0;
 
   /* Make sure that the exiting process is no longer scheduled,
    * and mark slot as FREE. Also mark saved fpu contents as not significant.
