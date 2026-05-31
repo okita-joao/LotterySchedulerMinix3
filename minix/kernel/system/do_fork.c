@@ -37,6 +37,7 @@ int do_fork(struct proc * caller, message * m_ptr)
   int gen;
   int p_proc;
   int namelen;
+  int m;
 
   if(!isokendpt(m_ptr->m_lsys_krn_sys_fork.endpt, &p_proc))
 	return EINVAL;
@@ -132,14 +133,22 @@ int do_fork(struct proc * caller, message * m_ptr)
   
   rpc->pai_endpt = rpp->p_endpoint;
   
-  int m = rpp->num_tickets / 2;
+  m = rpp->num_tickets / 2;
 
   if(m == 0) {
       m = 1;
   }
 
-  rpp->num_tickets = m;
+  if(2*m < rpp->num_tickets) {
+  	rpp->num_tickets = m+1;
+  }
+  else {
+	rpp->num_tickets = m;
+  }
   rpc->num_tickets = m;
+  rpc->emprestado = 0;
+  rpc->compensacao = 0;
+  rpc->devedor_endpt = NONE;
 
   return OK;
 }
