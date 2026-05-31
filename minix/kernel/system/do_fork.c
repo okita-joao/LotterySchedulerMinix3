@@ -130,7 +130,7 @@ int do_fork(struct proc * caller, message * m_ptr)
   rpc->p_seg.p_ttbr_v = NULL;
 #endif
   
-  rpc->pai = rpp;
+  rpc->pai_endpt = rpp->p_endpoint;
   
   int m = rpp->num_tickets / 2;
 
