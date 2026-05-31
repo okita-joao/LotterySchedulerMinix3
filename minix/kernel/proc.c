@@ -127,7 +127,12 @@ void proc_init(void)
 	 * table with privilege structures for the system processes. 
 	 */
 	for (rp = BEG_PROC_ADDR, i = -NR_TASKS; rp < END_PROC_ADDR; ++rp, ++i) {
-		rp->p_rts_flags = RTS_SLOT_FREE;/* initialize free slot */
+		rp->num_tickets = 0;
+                rp->pai = NULL;
+                rp->compensacao = 0;
+                rp->emprestado = 0;
+                rp->devedor_endpt = 0;
+                rp->p_rts_flags = RTS_SLOT_FREE;/* initialize free slot*/
 		rp->p_magic = PMAGIC;
 		rp->p_nr = i;			/* proc number from ptr */
 		rp->p_endpoint = _ENDPOINT(0, rp->p_nr); /* generation no. 0 */
@@ -1611,6 +1616,31 @@ void enqueue(
 
   assert(q >= 0);
 
+  if(rp->emprestado > 0) {
+      int nr_proc;
+
+      if(isokendpt(rp->devedor_endpt, &nr_proc)) {
+          struct proc devedor = proc_addr(nr_proc);
+
+          if(devedor->p_rts_flags != RTS_SLOT_FREE) {
+              if(devedor->num_tickets >= rp->emprestado) {
+                  devedor->num_tickets -= rp->emprestado;
+              }
+              else {
+                  devedor->num_tickets = 0;
+              }
+          }
+
+          rp->num_tickets += rp->emprestado;
+          rp->emprestado = 0;
+          rp->devedor_endpt = 0;
+      }
+  }
+
+  if(rp->num_tickets == 0) {
+      rp->num_tickets = (16 - q)*100;
+  }
+
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
 
@@ -1732,6 +1762,39 @@ void dequeue(struct proc *rp)
 
   assert(proc_ptr_ok(rp));
   assert(!proc_is_runnable(rp));
+
+  if(rp->compensacao > 0) {
+      rp->num_tickets -= rp->compensacao;
+      rp->compensacao = 0;
+  }
+
+  if(rp->p_rts_flags != 0 && rp->p_ticks_left > 0) {
+      int sobra = (rp->p_ticks_left * 100)/priv(rp)->s_quantum;
+      rp->compensacao = (rp->num_tickets * sobra)/100;
+  }
+
+  if(rp->p_rts-flags & RTS_RECEIVING) {
+      if(rp->p_ticks_left > 0) {
+          int sobra = (rp->p_ticks_left * 100)/(priv(rp)>s_quantum);
+          rp->compensacao = (rp->num_tickets * sobra)/100;
+          rp->num_tickets += rp->compensacao;
+      }
+
+      int nr_proc;
+
+      if(isokednpt(rp->p_getfrom_e, &nr_proc)) {
+          struct proc d*;
+          d = proc_addr(nr_proc);
+      
+
+          if(rp->num_tickets > d->num_tickets) {
+              d->num_tickets += rp->num_tickets;
+              rp->emprestado = rp->num_tickets;
+              rp->num_tickets = 0;
+              rp->devedor_endpt = d->p_endpoint;
+          }
+      }
+  }
 
   /* Side-effect for kernel: check if the task's stack still is ok? */
   assert (!iskernelp(rp) || *priv(rp)->s_stack_guard == STACK_GUARD);

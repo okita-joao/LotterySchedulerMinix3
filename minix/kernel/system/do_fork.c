@@ -129,6 +129,17 @@ int do_fork(struct proc * caller, message * m_ptr)
   rpc->p_seg.p_ttbr = 0;
   rpc->p_seg.p_ttbr_v = NULL;
 #endif
+  
+  rpc->pai = rpp;
+  
+  int m = rpp->num_tickets / 2;
+
+  if(m == 0) {
+      m = 1;
+  }
+
+  rpp->num_tickets = m;
+  rpc->num_tickets = m;
 
   return OK;
 }

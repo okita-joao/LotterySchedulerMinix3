@@ -20,6 +20,12 @@
 #include "priv.h"
 
 struct proc {
+  int num_tickets; /* Numero de tickets de um processo  */  
+  struct proc *pai; /* Ponteiro para o processo pai */
+  int compensacao; /* Flag que indica o saldo de compensacao  */
+  int emprestado; /* Tickets emprestados */}
+  int devedor_endpt; /* CPF do devedor */
+
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
   struct segframe p_seg;	/* segment descriptors */
   proc_nr_t p_nr;		/* number of this process (for fast access) */

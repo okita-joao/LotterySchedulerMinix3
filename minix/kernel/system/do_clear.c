@@ -50,6 +50,12 @@ int do_clear(struct proc * caller, message * m_ptr)
 
   /* Turn off any alarm timers at the clock. */   
   reset_kernel_timer(&priv(rc)->s_alarm_timer);
+  
+  if(rc->pai != NULL && !(rc->pai->p_rts_flags & RTS_SLOT_FREE)) {
+      rc->pai->num_tickets += rc->num_tickets;
+  }
+  rc->num_tickets = 0;
+  rc->pai = NULL;
 
   /* Make sure that the exiting process is no longer scheduled,
    * and mark slot as FREE. Also mark saved fpu contents as not significant.
