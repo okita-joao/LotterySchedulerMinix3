@@ -63,8 +63,32 @@ static void enqueue_head(struct proc *rp);
 /* all idles share the same idle_priv structure */
 static struct priv idle_priv;
 
-/* Vetor que armazena a quantidade de tickets em cada fila de prioridade */
+/* Matriz que armazena a quantidade de tickets em cada fila de prioridade. 
+ * É uma matriz pois cada CPU integrada no Sistema Computacional possui suas
+ * próprias filas de prioridade.
+ */
 unsigned int tickets_na_fila[CONFIG_MAX_CPUS][16];
+
+/* Vetor que guarda a soma dos tickets até a fila 11 de cada CPU (limite para os
+ * processos de usuários) */
+unsigned int tickets_ate_fila_11[CONFIG_MAX_CPUS];
+
+/* Variável estável/global que mantem o estado do gerador */
+static unsignedlong prox_random = 123456789;
+
+/* Função que sorteia os bilhetes para decidir qual processo ganha o quantum de CPU */
+unsigned int kernel_rand(unsigned int min, unsigned int max) {
+	u64_t tsc;
+	unsigned int delta;
+	unsigned int r_t;
+
+	if (max == 0 || max <= min) return min; /* Casos passíveis de erro */
+	read_tsc_64(&tsc);
+    delta = max - min;
+	prox_random = prox_random * 1103515245 + 12345 + (unsigned long)tsc;
+    r_t = (unsigned int)(prox_random % delta);
+	return r_t + min + 1;
+}
 
 static void set_idle_name(char * name, int n)
 {
@@ -1649,6 +1673,9 @@ void enqueue(
               }
 			  if(proc_is_runnable(devedor)) {
 			      tickets_na_fila[devedor->p_cpu][q_devedor] -= a_t;
+				  if(q_devedor < 12) {
+					  tickets_ate_fila_11[devedor->p_cpu] -= a_t;
+				  }
 		      }
           }
       }
@@ -1668,6 +1695,9 @@ void enqueue(
 
   /* Atualiza o contador de tickets da fila desse processo */
   tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
+  if(q < 12) {
+	  tickets_ate_fila_11[rp->p_cpu] += rp->num_tickets;
+  }
 	
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
@@ -1798,6 +1828,9 @@ void dequeue(struct proc *rp)
 
   /* Primeira coisa no processo de dequeue(p) é tirar os tickets da fila */
   tickets_na_fila[rp->p_cpu][q] -= rp->num_tickets;
+  if(q < 12) {
+	  tickets_ate_fila_11[rp->p_cpu] -= rp->num_tickets;
+  }
 	
   /* Verifica se o processo que acabou de rodar possuía tickets de
   compensação, e caso sim retira esses tickets.                 */
@@ -1832,6 +1865,9 @@ void dequeue(struct proc *rp)
 			  if(proc_is_runnable(d)) {
 			      q_d = d->p_priority;
 		          tickets_na_fila[d->p_cpu][q_d] += rp->emprestado;
+				  if(q_d < 12) {
+					  tickets_ate_fila_11[d->p_cpu] += rp->emprestado;
+				  }
 		      }
           }
       }
