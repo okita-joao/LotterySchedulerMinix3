@@ -63,6 +63,9 @@ static void enqueue_head(struct proc *rp);
 /* all idles share the same idle_priv structure */
 static struct priv idle_priv;
 
+/* Vetor que armazena a quantidade de tickets em cada fila de prioridade */
+unsigned int tickets_na_fila[CONFIG_MAX_CPUS][16];
+
 static void set_idle_name(char * name, int n)
 {
         int i, c;
@@ -1614,6 +1617,8 @@ void enqueue(
 
   int nr_proc;
   struct proc *devedor;
+  int q_devedor;
+  int a_t;
   
   assert(proc_is_runnable(rp));
 
@@ -1630,15 +1635,21 @@ void enqueue(
 	  /* Verifica se o devedor está vivo */
       if(isokendpt(rp->devedor_endpt, &nr_proc)) {
           devedor = proc_addr(nr_proc);
+		  q_devedor = devedor->p_priority;
 
 		  /* Desconta da conta do devedor o empréstimo */
           if(devedor->p_rts_flags != RTS_SLOT_FREE) {
               if(devedor->num_tickets >= rp->emprestado) {
                   devedor->num_tickets -= rp->emprestado;
+				  a_t = rp->emprestado;
               }
               else {
-                  devedor->num_tickets = 0;
+				  a_t = devedor->num_tickets - 1;
+                  devedor->num_tickets = 1; /* Processo faliu */
               }
+			  if(proc_is_runnable(devedor)) {
+			      tickets_na_fila[devedor->p_cpu][q_devedor] -= a_t;
+		      }
           }
       }
 	  /* Retorna os tickets emprestados e limpa as flags de empréstimo */
@@ -1655,6 +1666,9 @@ void enqueue(
       rp->num_tickets = (16 - q)*100;
   }
 
+  /* Atualiza o contador de tickets da fila desse processo */
+  tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
+	
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
 
@@ -1777,10 +1791,14 @@ void dequeue(struct proc *rp)
   int sobra;
   int nr_proc;
   struct proc *d;
+  int q_d;
 
   assert(proc_ptr_ok(rp));
   assert(!proc_is_runnable(rp));
 
+  /* Primeira coisa no processo de dequeue(p) é tirar os tickets da fila */
+  tickets_na_fila[rp->p_cpu][q] -= rp->num_tickets;
+	
   /* Verifica se o processo que acabou de rodar possuía tickets de
   compensação, e caso sim retira esses tickets.                 */
   if(rp->compensacao > 0) {
@@ -1811,6 +1829,10 @@ void dequeue(struct proc *rp)
               rp->emprestado = rp->num_tickets; /* Guarda o valor emprestado */
               rp->num_tickets = 0; /* Vai dormir pobre */
               rp->devedor_endpt = d->p_endpoint; /* Guarda o endpoint do devedor */
+			  if(proc_is_runnable(d)) {
+			      q_d = d->p_priority;
+		          tickets_na_fila[d->p_cpu][q_d] += rp->emprestado;
+		      }
           }
       }
   }
