@@ -2169,3 +2169,15 @@ void ser_dump_proc(void)
                 print_proc_recursive(pp);
         }
 }
+
+void init_tickets(void) {
+	int cpu, q;
+
+	for(cpu = 0; cpu < CONFIG_MAX_CPUS; cpu++) {
+		tickets_total[cpu] = 0;
+		tickets_ate_fila_11[cpu] = 0;
+		for(q = 0; q < 16; q++) {
+			tickets_na_fila[cpu][q] = 0;
+		}
+	}
+}
