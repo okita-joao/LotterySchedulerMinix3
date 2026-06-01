@@ -1941,17 +1941,60 @@ static struct proc * pick_proc(void)
   register struct proc *rp;			/* process to run */
   struct proc **rdy_head;
   int q;				/* iterate over queues */
+  unsigned int t;
+  unsigned int bilhete;
+  unsigned int S;
+  int M;
 
   /* Check each of the scheduling queues for ready processes. The number of
    * queues is defined in proc.h, and priorities are set in the task table.
    * If there are no processes ready to run, return NULL.
    */
   rdy_head = get_cpulocal_var(run_q_head);
-  for (q=0; q < NR_SCHED_QUEUES; q++) {	
+
+  t = get_cpulocal_var(ptproc)->p_cpu; /* Pega o index da CPU atual*/
+  S = 0; /* Contador dos tickets acumulados durante a busca */
+  M = 12; /* Flag que indica se o Lottery é Global(M = 0) ou Híbrido(M = 12) */
+
+  /* Sorteio do bilhete */
+  if(M == 0) {
+    bilhete = kernel_rand(0, tickets_total[t]); 
+  }
+  else{
+	/* Ele limita o máximo com tickets_total[t] - tickets_na_fila[t][15]
+	para que não ocorra a  possibilidade de o processo IDLE ser sorteado
+	mesmo havendo processos de usuário pronto.
+	*/
+    bilhete = kernel_rand(tickets_ate_fila_11[t], tickets_total[t] - tickets_na_fila[t][15]);
+  }
+
+  /* Escalonamento dos processos iniciais (Pulado caso o Lottery seja Global!!) */
+  for (q=0; q < M; q++) {	
+	S += tickets_na_fila[t][q];
 	if(!(rp = rdy_head[q])) {
 		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););
 		continue;
 	}
+	assert(proc_is_runnable(rp));
+	if (priv(rp)->s_flags & BILLABLE)	 	
+		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
+	return rp;
+  }
+	
+  /* Busca o processo cujo bilhete foi sorteado */
+  for (q=M; q < NR_SCHED_QUEUES; q++) {
+	if (S + tickets_na_fila[t][q] > bilhete)) {
+        rp = rdy_head[q];
+		while (S + rp->num_tickets < bilhete && rp->p_nextready != NULL) {
+			S += rp->num_tickets;
+			rp = rp->p_nextready;
+		}
+	}
+	else {
+		S += tickets_na_fila[t][q];
+		continue;
+	}
+	
 	assert(proc_is_runnable(rp));
 	if (priv(rp)->s_flags & BILLABLE)	 	
 		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
