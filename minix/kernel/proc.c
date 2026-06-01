@@ -73,6 +73,9 @@ unsigned int tickets_na_fila[CONFIG_MAX_CPUS][16];
  * processos de usuários) */
 unsigned int tickets_ate_fila_11[CONFIG_MAX_CPUS];
 
+/* Vetor que guarda o total de tickets dos processos prontos em cada CPU */
+unsigned int tickets_total[CONFIG_MAX_CPUS];
+
 /* Variável estável/global que mantem o estado do gerador */
 static unsignedlong prox_random = 123456789;
 
@@ -1676,6 +1679,7 @@ void enqueue(
 				  if(q_devedor < 12) {
 					  tickets_ate_fila_11[devedor->p_cpu] -= a_t;
 				  }
+				  tickets_total[devedor->p_cpu] -= a_t;
 		      }
           }
       }
@@ -1695,6 +1699,7 @@ void enqueue(
 
   /* Atualiza o contador de tickets da fila desse processo */
   tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
+  tickets_total[rp->p_cpu] += rp->num_tickets;
   if(q < 12) {
 	  tickets_ate_fila_11[rp->p_cpu] += rp->num_tickets;
   }
@@ -1828,6 +1833,8 @@ void dequeue(struct proc *rp)
 
   /* Primeira coisa no processo de dequeue(p) é tirar os tickets da fila */
   tickets_na_fila[rp->p_cpu][q] -= rp->num_tickets;
+  tickets_total[rp->p_cpu] -= rp->num_tickets;
+
   if(q < 12) {
 	  tickets_ate_fila_11[rp->p_cpu] -= rp->num_tickets;
   }
@@ -1865,6 +1872,7 @@ void dequeue(struct proc *rp)
 			  if(proc_is_runnable(d)) {
 			      q_d = d->p_priority;
 		          tickets_na_fila[d->p_cpu][q_d] += rp->emprestado;
+				  tickets_total[d->p_cpu] += rp->emprestado;
 				  if(q_d < 12) {
 					  tickets_ate_fila_11[d->p_cpu] += rp->emprestado;
 				  }
