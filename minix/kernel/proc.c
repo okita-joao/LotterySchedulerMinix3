@@ -127,12 +127,12 @@ void proc_init(void)
 	 * table with privilege structures for the system processes. 
 	 */
 	for (rp = BEG_PROC_ADDR, i = -NR_TASKS; rp < END_PROC_ADDR; ++rp, ++i) {
-		rp->num_tickets = 0;
-                rp->pai = NULL;
-                rp->compensacao = 0;
-                rp->emprestado = 0;
-                rp->devedor_endpt = 0;
-                rp->p_rts_flags = RTS_SLOT_FREE;/* initialize free slot*/
+		rp->num_tickets = 0; /* Inicializa o slot de processo com 0 tickets */
+        rp->pai_endpt = NONE; /* Inicializa o slot de processo com pai nulo */
+        rp->compensacao = 0; /* Inicializa o slot de processo com 0 tickets de compensação */
+        rp->emprestado = 0; /* Inicializa o slot de processo com 0 tickets emprestados */
+        rp->devedor_endpt = NONE; /* Inicializa o slot de processo com devedor nulo */
+        rp->p_rts_flags = RTS_SLOT_FREE;/* initialize free slot*/
 		rp->p_magic = PMAGIC;
 		rp->p_nr = i;			/* proc number from ptr */
 		rp->p_endpoint = _ENDPOINT(0, rp->p_nr); /* generation no. 0 */
@@ -1611,17 +1611,27 @@ void enqueue(
  */
   int q = rp->p_priority;	 		/* scheduling queue to use */
   struct proc **rdy_head, **rdy_tail;
+
+  int nr_proc;
+  struct proc *devedor;
   
   assert(proc_is_runnable(rp));
 
   assert(q >= 0);
 
+  /* 
+  Caso o  processo estava  bloqueado, e  dependendo de um outro processo
+  de menor  prioridade, esta  parte da função  enqueue(p) verifica se há
+  tickets  emprestados  ainda para o  processo  devedor e  recupera esse
+  saldo, e também caso o devedor esteja vivo desconta da conta dele esse 
+  empréstimo.
+  */
   if(rp->emprestado > 0) {
-      int nr_proc;
-
+	  /* Verifica se o devedor está vivo */
       if(isokendpt(rp->devedor_endpt, &nr_proc)) {
-          struct proc devedor = proc_addr(nr_proc);
+          devedor = proc_addr(nr_proc);
 
+		  /* Desconta da conta do devedor o empréstimo */
           if(devedor->p_rts_flags != RTS_SLOT_FREE) {
               if(devedor->num_tickets >= rp->emprestado) {
                   devedor->num_tickets -= rp->emprestado;
@@ -1630,13 +1640,17 @@ void enqueue(
                   devedor->num_tickets = 0;
               }
           }
-
-          rp->num_tickets += rp->emprestado;
-          rp->emprestado = 0;
-          rp->devedor_endpt = 0;
       }
+	  /* Retorna os tickets emprestados e limpa as flags de empréstimo */
+	  rp->num_tickets += rp->emprestado;
+      rp->emprestado = 0;
+      rp->devedor_endpt = NONE;
   }
 
+  /* Em casos de processos nativos o Minix 3 atribui a eles 0 tickets iniciais
+  e essa verificação garante que eles recebam um saldo inicial antes de  come-
+  çarem a executar.
+  */
   if(rp->num_tickets == 0) {
       rp->num_tickets = (16 - q)*100;
   }
@@ -1760,38 +1774,43 @@ void dequeue(struct proc *rp)
 
   struct proc **rdy_tail;
 
+  int sobra;
+  int nr_proc;
+  struct proc *d;
+
   assert(proc_ptr_ok(rp));
   assert(!proc_is_runnable(rp));
 
+  /* Verifica se o processo que acabou de rodar possuía tickets de
+  compensação, e caso sim retira esses tickets.                 */
   if(rp->compensacao > 0) {
       rp->num_tickets -= rp->compensacao;
       rp->compensacao = 0;
   }
 
-  if(rp->p_rts_flags != 0 && rp->p_ticks_left > 0) {
-      int sobra = (rp->p_ticks_left * 100)/priv(rp)->s_quantum;
-      rp->compensacao = (rp->num_tickets * sobra)/100;
-  }
-
-  if(rp->p_rts-flags & RTS_RECEIVING) {
+  /* Caso o processo receba uma interrupção de I/O */
+  if(rp->p_rts_flags & RTS_RECEIVING) {
+	  /* Calcula a fração de quantum utilizada pelo processo e
+	  dá tickets de compensação condizentes com a fração utilizada
+	  */
       if(rp->p_ticks_left > 0) {
-          int sobra = (rp->p_ticks_left * 100)/(priv(rp)>s_quantum);
+          sobra = (rp->p_ticks_left * 100)/(priv(rp)->s_quantum);
           rp->compensacao = (rp->num_tickets * sobra)/100;
           rp->num_tickets += rp->compensacao;
       }
 
-      int nr_proc;
-
-      if(isokednpt(rp->p_getfrom_e, &nr_proc)) {
-          struct proc d*;
+	  /* Verifica se o processo que o interrompeu tem menos tickets
+	  do que ele mesmo, para evitar a Inversão de Prioridade no es-
+	  calonamento. E caso sim o processo  bloqueado empresta  todos
+	  os seus tickets para o procedimento que o interrompeu. */
+      if(isokendpt(rp->p_getfrom_e, &nr_proc)) {
           d = proc_addr(nr_proc);
-      
 
           if(rp->num_tickets > d->num_tickets) {
-              d->num_tickets += rp->num_tickets;
-              rp->emprestado = rp->num_tickets;
-              rp->num_tickets = 0;
-              rp->devedor_endpt = d->p_endpoint;
+              d->num_tickets += rp->num_tickets; /* Empresta os tickets */
+              rp->emprestado = rp->num_tickets; /* Guarda o valor emprestado */
+              rp->num_tickets = 0; /* Vai dormir pobre */
+              rp->devedor_endpt = d->p_endpoint; /* Guarda o endpoint do devedor */
           }
       }
   }
