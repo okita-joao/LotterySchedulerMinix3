@@ -1823,6 +1823,7 @@ void dequeue(struct proc *rp)
 
   struct proc **rdy_tail;
 
+  unsigned temp;
   int sobra;
   int nr_proc;
   struct proc *d;
@@ -1851,10 +1852,15 @@ void dequeue(struct proc *rp)
 	  /* Calcula a fração de quantum utilizada pelo processo e
 	  dá tickets de compensação condizentes com a fração utilizada
 	  */
-      if(rp->p_ticks_left > 0) {
-          sobra = (rp->p_ticks_left * 100)/(priv(rp)->s_quantum);
-          rp->compensacao = (rp->num_tickets * sobra)/100;
-          rp->num_tickets += rp->compensacao;
+      if(rp->p_cpu_time_left > 0) {
+	      temp = cpu_time_2_ms(rp->p_cpu_time_left);
+	      temp = rp->p_quantum_size_ms - temp;
+
+	      if (temp == 0) {
+	          temps = 1;
+	      }
+
+	      rp->num_tickets = (rp->num_tickets * rp->p_quantum_size_ms) / temp;
       }
 
 	  /* Verifica se o processo que o interrompeu tem menos tickets
@@ -1983,7 +1989,7 @@ static struct proc * pick_proc(void)
 	
   /* Busca o processo cujo bilhete foi sorteado */
   for (q=M; q < NR_SCHED_QUEUES; q++) {
-	if (S + tickets_na_fila[t][q] > bilhete)) {
+	if (S + tickets_na_fila[t][q] > bilhete) {
         rp = rdy_head[q];
 		while (S + rp->num_tickets < bilhete && rp->p_nextready != NULL) {
 			S += rp->num_tickets;
