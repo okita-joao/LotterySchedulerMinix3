@@ -71,7 +71,7 @@ unsigned int tickets_na_fila[CONFIG_MAX_CPUS][16];
 
 /* Vetor que guarda a soma dos tickets até a fila 11 de cada CPU (limite para os
  * processos de usuários) */
-unsigned int tickets_ate_fila_11[CONFIG_MAX_CPUS];
+unsigned int tickets_ate_fila_6[CONFIG_MAX_CPUS];
 
 /* Vetor que guarda o total de tickets dos processos prontos em cada CPU */
 unsigned int tickets_total[CONFIG_MAX_CPUS];
@@ -1676,8 +1676,8 @@ void enqueue(
               }
 			  if(proc_is_runnable(devedor)) {
 			      tickets_na_fila[devedor->p_cpu][q_devedor] -= a_t;
-				  if(q_devedor < 12) {
-					  tickets_ate_fila_11[devedor->p_cpu] -= a_t;
+				  if(q_devedor < 7) {
+					  tickets_ate_fila_6[devedor->p_cpu] -= a_t;
 				  }
 				  tickets_total[devedor->p_cpu] -= a_t;
 		      }
@@ -1700,8 +1700,8 @@ void enqueue(
   /* Atualiza o contador de tickets da fila desse processo */
   tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
   tickets_total[rp->p_cpu] += rp->num_tickets;
-  if(q < 12) {
-	  tickets_ate_fila_11[rp->p_cpu] += rp->num_tickets;
+  if(q < 7) {
+	  tickets_ate_fila_6[rp->p_cpu] += rp->num_tickets;
   }
 	
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
@@ -1836,8 +1836,8 @@ void dequeue(struct proc *rp)
   tickets_na_fila[rp->p_cpu][q] -= rp->num_tickets;
   tickets_total[rp->p_cpu] -= rp->num_tickets;
 
-  if(q < 12) {
-	  tickets_ate_fila_11[rp->p_cpu] -= rp->num_tickets;
+  if(q < 7) {
+	  tickets_ate_fila_6[rp->p_cpu] -= rp->num_tickets;
   }
 	
   /* Verifica se o processo que acabou de rodar possuía tickets de
@@ -1879,8 +1879,8 @@ void dequeue(struct proc *rp)
 			      q_d = d->p_priority;
 		          tickets_na_fila[d->p_cpu][q_d] += rp->emprestado;
 				  tickets_total[d->p_cpu] += rp->emprestado;
-				  if(q_d < 12) {
-					  tickets_ate_fila_11[d->p_cpu] += rp->emprestado;
+				  if(q_d < 7) {
+					  tickets_ate_fila_6[d->p_cpu] += rp->emprestado;
 				  }
 		      }
           }
@@ -1960,7 +1960,7 @@ static struct proc * pick_proc(void)
 
   t = get_cpulocal_var(ptproc)->p_cpu; /* Pega o index da CPU atual*/
   S = 0; /* Contador dos tickets acumulados durante a busca */
-  M = 12; /* Flag que indica se o Lottery é Global(M = 0) ou Híbrido(M = 12) */
+  M = 7; /* Flag que indica se o Lottery é Global(M = 0) ou Híbrido(M = 12) */
 
   /* Sorteio do bilhete */
   if(M == 0) {
@@ -1971,7 +1971,7 @@ static struct proc * pick_proc(void)
 	para que não ocorra a  possibilidade de o processo IDLE ser sorteado
 	mesmo havendo processos de usuário pronto.
 	*/
-    bilhete = kernel_rand(tickets_ate_fila_11[t], tickets_total[t] - tickets_na_fila[t][15]);
+    bilhete = kernel_rand(tickets_ate_fila_6[t], tickets_total[t] - tickets_na_fila[t][15]);
   }
 
   /* Escalonamento dos processos iniciais (Pulado caso o Lottery seja Global!!) */
@@ -2181,7 +2181,7 @@ void init_tickets(void) {
 
 	for(cpu = 0; cpu < CONFIG_MAX_CPUS; cpu++) {
 		tickets_total[cpu] = 0;
-		tickets_ate_fila_11[cpu] = 0;
+		tickets_ate_fila_6[cpu] = 0;
 		for(q = 0; q < 16; q++) {
 			tickets_na_fila[cpu][q] = 0;
 		}
