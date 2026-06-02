@@ -77,7 +77,7 @@ unsigned int tickets_ate_fila_11[CONFIG_MAX_CPUS];
 unsigned int tickets_total[CONFIG_MAX_CPUS];
 
 /* Variável estável/global que mantem o estado do gerador */
-static unsignedlong prox_random = 123456789;
+static unsigned long prox_random = 123456789;
 
 /* Função que sorteia os bilhetes para decidir qual processo ganha o quantum de CPU */
 unsigned int kernel_rand(unsigned int min, unsigned int max) {
@@ -1857,7 +1857,7 @@ void dequeue(struct proc *rp)
 	      temp = rp->p_quantum_size_ms - temp;
 
 	      if (temp == 0) {
-	          temps = 1;
+	          temp = 1;
 	      }
 
 	      rp->num_tickets = (rp->num_tickets * rp->p_quantum_size_ms) / temp;
