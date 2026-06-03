@@ -1798,6 +1798,11 @@ static void enqueue_head(struct proc *rp)
   rp->p_accounting.dequeues--;
   rp->p_accounting.preempted++;
 
+  tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
+  tickets_total[rp->p_cpu] += rp->num_tickets;
+  if(q < 7)
+	  tickets_ate_fila_6[rp->p_cpu] += rp->num_tickets;
+
 #if DEBUG_SANITYCHECKS
   assert(runqueues_ok_local());
 #endif
@@ -1824,7 +1829,7 @@ void dequeue(struct proc *rp)
   struct proc **rdy_tail;
 
   unsigned temp;
-  int sobra;
+  int base;
   int nr_proc;
   struct proc *d;
   int q_d;
@@ -1854,13 +1859,14 @@ void dequeue(struct proc *rp)
 	  */
       if(rp->p_cpu_time_left > 0) {
 	      temp = cpu_time_2_ms(rp->p_cpu_time_left);
-	      temp = rp->p_quantum_size_ms - temp;
 
 	      if (temp == 0) {
 	          temp = 1;
 	      }
 
-	      rp->num_tickets = (rp->num_tickets * rp->p_quantum_size_ms) / temp;
+		  base = rp->num_tickets;
+		  rp->num_tickets = base + (base * temp / rp->p_quantum_size_ms);
+		  rp->compensacao = rp->num_tickets - base;
       }
 
 	  /* Verifica se o processo que o interrompeu tem menos tickets
