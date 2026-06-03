@@ -25,6 +25,7 @@ int do_clear(struct proc * caller, message * m_ptr)
   struct proc *rc;
   int exit_p;
   int i;
+  int a_t;
   int nr_pai;
   int nr_devedor;
   struct proc *devedor;
@@ -63,14 +64,21 @@ int do_clear(struct proc * caller, message * m_ptr)
       /* Caso o devedor esteja vivo cobra o empréstimo dele antes de morrer*/
       if(devedor->p_rts_flags != RTS_SLOT_FREE) {
         if(devedor->num_tickets >= rc->emprestado) {
-          devedor->num_tickets -= rc->emprestado;
+          a_t = rc->emprestado;
         }
         else {
-          devedor->num_tickets = 1;
+          a_t = devedor->num_tickets - 1;
         }
+
+        devedor->num_tickets -= a_t; /* Aplica cobrança */
+        
+        tickets_na_fila[devedor->p_cpu][devedor->p_priority] -= a_t;
+        tickets_total[devedor->p_cpu] -= a_t;
+        if (devedor->p_priority < 7)
+          tickets_ate_fila_6[devedor->p_cpu] -= a_t;
       }
     }
-    rc->num_tickets += rc->emprestado;
+    rc->num_tickets += a_t;
     rc->emprestado = 0;
   }
 
@@ -82,6 +90,13 @@ int do_clear(struct proc * caller, message * m_ptr)
     /* Caso o pai ainda esteja vivo o processo retorna a herança que recebeu a ele */
     if(pai->p_rts_flags != RTS_SLOT_FREE) {
       pai->num_tickets += rc->num_tickets;
+
+      if (pai->p_rts_flags == 0) {
+        tickets_na_fila[pai->p_cpu][pai->p_priority] += rc->num_tickets;
+        tickets_total[pai->p_cpu] += rc->num_tickets;
+        if (pai->p_priority < 7)
+          tickets_ate_fila_6[pai->p_cpu] += rc->num_tickets;
+      }
     }
   }
 
