@@ -59,6 +59,7 @@ int do_clear(struct proc * caller, message * m_ptr)
   /* Antes de morrer verifica se seus tickets ainda estão emprestados,
   se sim ele cobra de volta para retorna-los ao pai */
   if(rc->emprestado > 0) {
+    a_t = 0; /* Inicialização de a_t para evitar lixo de memória */
     if(isokendpt(rc->devedor_endpt, &nr_devedor)) {
       devedor = proc_addr(nr_devedor);
       /* Caso o devedor esteja vivo cobra o empréstimo dele antes de morrer*/
@@ -71,11 +72,13 @@ int do_clear(struct proc * caller, message * m_ptr)
         }
 
         devedor->num_tickets -= a_t; /* Aplica cobrança */
-        
-        tickets_na_fila[devedor->p_cpu][devedor->p_priority] -= a_t;
-        tickets_total[devedor->p_cpu] -= a_t;
-        if (devedor->p_priority < 7)
-          tickets_ate_fila_6[devedor->p_cpu] -= a_t;
+        /* Atualização das estruturas de dados importantes */
+        if(devedor->p_rts_flags == 0) {
+          tickets_na_fila[devedor->p_cpu][devedor->p_priority] -= a_t;
+          tickets_total[devedor->p_cpu] -= a_t;
+          if (devedor->p_priority < 7)
+            tickets_ate_fila_6[devedor->p_cpu] -= a_t;
+        }
       }
     }
     rc->num_tickets += a_t;
@@ -89,13 +92,19 @@ int do_clear(struct proc * caller, message * m_ptr)
 
     /* Caso o pai ainda esteja vivo o processo retorna a herança que recebeu a ele */
     if(pai->p_rts_flags != RTS_SLOT_FREE) {
-      pai->num_tickets += rc->num_tickets;
+      if(rc->num_tickets < rc->num_tickets_base) {
+        a_t = rc->num_tickets;
+      }
+      else {
+        a_t = rc->num_tickets_base;
+      }
+      pai->num_tickets += a_t;
 
       if (pai->p_rts_flags == 0) {
-        tickets_na_fila[pai->p_cpu][pai->p_priority] += rc->num_tickets;
-        tickets_total[pai->p_cpu] += rc->num_tickets;
+        tickets_na_fila[pai->p_cpu][pai->p_priority] += a_t;
+        tickets_total[pai->p_cpu] += a_t;
         if (pai->p_priority < 7)
-          tickets_ate_fila_6[pai->p_cpu] += rc->num_tickets;
+          tickets_ate_fila_6[pai->p_cpu] += a_t;
       }
     }
   }
