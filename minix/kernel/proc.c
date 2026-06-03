@@ -1659,6 +1659,7 @@ void enqueue(
   empréstimo.
   */
   if(rp->emprestado > 0) {
+	  a_t = 0;
 	  /* Verifica se o devedor está vivo */
       if(isokendpt(rp->devedor_endpt, &nr_proc)) {
           devedor = proc_addr(nr_proc);
@@ -1684,7 +1685,7 @@ void enqueue(
           }
       }
 	  /* Retorna os tickets emprestados e limpa as flags de empréstimo */
-	  rp->num_tickets += rp->emprestado;
+	  rp->num_tickets += a_t;
       rp->emprestado = 0;
       rp->devedor_endpt = NONE;
   }
@@ -1995,7 +1996,7 @@ static struct proc * pick_proc(void)
 	
   /* Busca o processo cujo bilhete foi sorteado */
   for (q=LOTTERY_MODE; q < NR_SCHED_QUEUES; q++) {
-	if (S + tickets_na_fila[t][q] >= bilhete) {
+	if (tickets_na_fila[t][q] > 0 && S + tickets_na_fila[t][q] >= bilhete) {
         rp = rdy_head[q];
 		while (S + rp->num_tickets < bilhete && rp->p_nextready != NULL) {
 			S += rp->num_tickets;
