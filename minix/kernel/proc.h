@@ -136,6 +136,7 @@ struct proc {
 #endif
 
   int num_tickets; /* Numero de tickets de um processo  */  
+  int num_tickets_base; /* Número de tickets iniciais de um processo */
   endpoint_t pai_endpt; /* Endpoint do processo pai */
   int compensacao; /* Flag que indica o saldo de compensacao  */
   int emprestado; /* Tickets emprestados */
