@@ -26,6 +26,8 @@ int do_clear(struct proc * caller, message * m_ptr)
   int exit_p;
   int i;
   int nr_pai;
+  int nr_devedor;
+  struct proc *devedor;
   struct proc *pai;
   
   if(!isokendpt(m_ptr->m_lsys_krn_sys_clear.endpt, &exit_p)) {
@@ -53,6 +55,25 @@ int do_clear(struct proc * caller, message * m_ptr)
   /* Turn off any alarm timers at the clock. */   
   reset_kernel_timer(&priv(rc)->s_alarm_timer);
 
+  /* Antes de morrer verifica se seus tickets ainda estão emprestados,
+  se sim ele cobra de volta para retorna-los ao pai */
+  if(rc->emprestado > 0) {
+    if(isokendpt(rc->devedor_endpt, &nr_devedor)) {
+      devedor = proc_addr(nr_devedor);
+      /* Caso o devedor esteja vivo cobra o empréstimo dele antes de morrer*/
+      if(devedor->p_rts_flags != RTS_SLOT_FREE) {
+        if(devedor->num_tickets >= rc->emprestado) {
+          devedor->num_tickets -= rc->emprestado;
+        }
+        else {
+          devedor->num_tickets = 1;
+        }
+      }
+    }
+    rc->num_tickets += rc->emprestado;
+    rc->emprestado = 0;
+  }
+
   
   /* Verifica se o pai ainda está vivo pelo seu endpoint guardado */
   if(isokendpt(rc->pai_endpt, &nr_pai)) {
@@ -66,7 +87,6 @@ int do_clear(struct proc * caller, message * m_ptr)
 
   rc->num_tickets = 0;
   rc->pai_endpt = NONE;
-  rc->emprestado = 0;
   rc->devedor_endpt = NONE;
 
   /* Make sure that the exiting process is no longer scheduled,
