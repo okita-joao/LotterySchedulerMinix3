@@ -1997,7 +1997,7 @@ static struct proc * pick_proc(void)
 	
   /* Busca o processo cujo bilhete foi sorteado */
   for (q=M; q < NR_SCHED_QUEUES; q++) {
-	if (S + tickets_na_fila[t][q] > bilhete) {
+	if (S + tickets_na_fila[t][q] >= bilhete) {
         rp = rdy_head[q];
 		while (S + rp->num_tickets < bilhete && rp->p_nextready != NULL) {
 			S += rp->num_tickets;
