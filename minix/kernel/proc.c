@@ -1777,6 +1777,10 @@ static void enqueue_head(struct proc *rp)
 
   assert(q >= 0);
 
+  tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
+  tickets_total[rp->p_cpu] += rp->num_tickets;
+  if(q < 7)
+	  tickets_ate_fila_6[rp->p_cpu] += rp->num_tickets;
 
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
@@ -1797,11 +1801,6 @@ static void enqueue_head(struct proc *rp)
   /* Process accounting for scheduling */
   rp->p_accounting.dequeues--;
   rp->p_accounting.preempted++;
-
-  tickets_na_fila[rp->p_cpu][q] += rp->num_tickets;
-  tickets_total[rp->p_cpu] += rp->num_tickets;
-  if(q < 7)
-	  tickets_ate_fila_6[rp->p_cpu] += rp->num_tickets;
 
 #if DEBUG_SANITYCHECKS
   assert(runqueues_ok_local());
@@ -1830,6 +1829,8 @@ void dequeue(struct proc *rp)
 
   unsigned temp;
   int base;
+  unsigned int boosted;
+  unsigned int max_boost;
   int nr_proc;
   struct proc *d;
   int q_d;
@@ -1858,14 +1859,15 @@ void dequeue(struct proc *rp)
 	  dá tickets de compensação condizentes com a fração utilizada
 	  */
       if(rp->p_cpu_time_left > 0) {
-	      temp = cpu_time_2_ms(rp->p_cpu_time_left);
-
-	      if (temp == 0) {
-	          temp = 1;
-	      }
-
-		  base = rp->num_tickets;
-		  rp->num_tickets = base + (base * temp / rp->p_quantum_size_ms);
+	      base = rp->num_tickets;
+		  temp = cpu_time_2_ms(rp->p_cpu_time_left);
+		  temp = rp->p_quantum_size_ms - temp;
+		  if(temp == 0) temp = 1;
+	
+		  boosted = (base * rp->p_quantum_size_ms) / temp;
+		  max_boost = base * 3;
+		  rp->num_tickets = (boosted < max_boost) ? boosted : max_boost;
+		
 		  rp->compensacao = rp->num_tickets - base;
       }
 
