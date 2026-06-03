@@ -146,6 +146,7 @@ int do_fork(struct proc * caller, message * m_ptr)
 	rpp->num_tickets = m;
   }
   rpc->num_tickets = m;
+  rpc->num_tickets_base = m;
   rpc->emprestado = 0;
   rpc->compensacao = 0;
   rpc->devedor_endpt = NONE;
