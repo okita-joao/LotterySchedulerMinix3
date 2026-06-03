@@ -1958,7 +1958,6 @@ static struct proc * pick_proc(void)
   unsigned int t;
   unsigned int bilhete;
   unsigned int S;
-  int M;
 
   /* Check each of the scheduling queues for ready processes. The number of
    * queues is defined in proc.h, and priorities are set in the task table.
@@ -1968,10 +1967,9 @@ static struct proc * pick_proc(void)
 
   t = get_cpulocal_var(ptproc)->p_cpu; /* Pega o index da CPU atual*/
   S = 0; /* Contador dos tickets acumulados durante a busca */
-  M = 7; /* Flag que indica se o Lottery é Global(M = 0) ou Híbrido(M = 12) */
 
   /* Sorteio do bilhete */
-  if(M == 0) {
+  if(LOTTERY_MODE == 0) {
     bilhete = kernel_rand(0, tickets_total[t]); 
   }
   else{
@@ -1983,7 +1981,7 @@ static struct proc * pick_proc(void)
   }
 
   /* Escalonamento dos processos iniciais (Pulado caso o Lottery seja Global!!) */
-  for (q=0; q < M; q++) {	
+  for (q=0; q < LOTTERY_MODE; q++) {	
 	S += tickets_na_fila[t][q];
 	if(!(rp = rdy_head[q])) {
 		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););
@@ -1996,7 +1994,7 @@ static struct proc * pick_proc(void)
   }
 	
   /* Busca o processo cujo bilhete foi sorteado */
-  for (q=M; q < NR_SCHED_QUEUES; q++) {
+  for (q=LOTTERY_MODE; q < NR_SCHED_QUEUES; q++) {
 	if (S + tickets_na_fila[t][q] >= bilhete) {
         rp = rdy_head[q];
 		while (S + rp->num_tickets < bilhete && rp->p_nextready != NULL) {
