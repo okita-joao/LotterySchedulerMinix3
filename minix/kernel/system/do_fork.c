@@ -18,6 +18,10 @@
 #include <minix/endpoint.h>
 #include <minix/u64.h>
 
+extern unsigned int tickets_na_fila[CONFIG_MAX_CPUS][16];
+extern unsigned int tickets_ate_fila_6[CONFIG_MAX_CPUS];
+extern unsigned int tickets_total[CONFIG_MAX_CPUS];
+
 #if USE_FORK
 
 /*===========================================================================*
