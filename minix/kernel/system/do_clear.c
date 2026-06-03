@@ -92,12 +92,7 @@ int do_clear(struct proc * caller, message * m_ptr)
 
     /* Caso o pai ainda esteja vivo o processo retorna a herança que recebeu a ele */
     if(pai->p_rts_flags != RTS_SLOT_FREE) {
-      if(rc->num_tickets < rc->num_tickets_base) {
-        a_t = rc->num_tickets;
-      }
-      else {
-        a_t = rc->num_tickets_base;
-      }
+      a_t = rc->num_tickets_base;
       pai->num_tickets += a_t;
 
       if (pai->p_rts_flags == 0) {
