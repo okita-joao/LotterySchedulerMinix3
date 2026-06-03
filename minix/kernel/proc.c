@@ -1971,7 +1971,7 @@ static struct proc * pick_proc(void)
 	para que não ocorra a  possibilidade de o processo IDLE ser sorteado
 	mesmo havendo processos de usuário pronto.
 	*/
-    bilhete = kernel_rand(tickets_ate_fila_6[t], tickets_total[t] - tickets_na_fila[t][15]);
+    bilhete = kernel_rand(tickets_ate_fila_6[t], tickets_total[t]);
   }
 
   /* Escalonamento dos processos iniciais (Pulado caso o Lottery seja Global!!) */
