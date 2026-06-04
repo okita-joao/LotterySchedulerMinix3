@@ -1694,7 +1694,7 @@ void enqueue(
   e essa verificação garante que eles recebam um saldo inicial antes de  come-
   çarem a executar.
   */
-  if(rp->num_tickets == 0) {
+  if(rp->num_tickets <= 0) {
       rp->num_tickets = (16 - q)*100;
   }
 
